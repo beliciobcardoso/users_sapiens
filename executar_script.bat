@@ -1,0 +1,1 @@
+start "" /B powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\projetos\python\users_sapiens\desconect_users_sapiens.ps1

@@ -17,12 +17,12 @@ conn = pymssql.connect(
 
 
 def main(page: ft.Page):
-    title = ft.Text("Usuarios Sapiens Conectados", size=20)
+    title = ft.Text("Usuários Sapiens Conectados", size=20)
     idUser = ft.TextField(label="ID User", width=100)
-    page.window_always_on_top = True
+    # page.window_always_on_top = True
     page.window_width = 1200
     page.window_height = 800
-    page.title = "Usuarios Sapiens"
+    page.title = "Usuários Sapiens"
     # row = ft.Row(wrap=True, scroll="always", expand=True)
     # page.add(row)
     # page.vertical_alignment = ft.MainAxisAlignment.CENTER
@@ -66,7 +66,7 @@ def main(page: ft.Page):
         border=ft.border.all(2, "blue"),
         border_radius=10,
         columns=[
-            ft.DataColumn(ft.Text("MODULOSss")),
+            ft.DataColumn(ft.Text("MODULOS")),
             ft.DataColumn(ft.Text("ID_CONEXAO")),
             ft.DataColumn(ft.Text("DATA_CONEXAO")),
             ft.DataColumn(ft.Text("NAME_SERVER")),
@@ -104,8 +104,8 @@ def main(page: ft.Page):
     def delete(e):
         try:
             id = idUser.value
-            cursor.execute(
-                f"DELETE FROM sapiens.dbo.r911mod WHERE numsec = {id}")
+            cursor.execute(f"DELETE FROM sapiens.dbo.r911mod WHERE numsec = {id}")
+            cursor.execute(f"DELETE FROM sapiens.dbo.r911sec WHERE numsec = {id}")
             conn.commit()
             table.rows.clear()
             load_data()
