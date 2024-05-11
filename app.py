@@ -1,22 +1,47 @@
 import os
+import time
 
 import dotenv
 import flet as ft
-import pymssql
+import pyodbc
+import logging
 
-dotenv.load_dotenv()
+# Configuração do logger com info e error
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+logging.basicConfig(filename='app.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-# Connect to the database
-conn = pymssql.connect(
-    server=os.getenv("SERVER"),
-    database=os.getenv("DATABASE"),
-    user=os.getenv("USER"),
-    password=os.getenv("PASSWORD"),
-    as_dict=True
-)
+dotenv.load_dotenv(dotenv.find_dotenv())
+
+driver = '{SQL Server}'
+server=os.getenv("SERVER")
+database=os.getenv("DATABASE")
+username=os.getenv("USER")
+password=os.getenv("PASSWORD")
+
+user_login = os.getenv("USER_LOGIN")
+password_login = os.getenv("PASSWORD_LOGIN")
+
+# Função para conectar ao banco de dados SQL Server
+def conectar_banco():
+    while True:
+        try:
+            conn = pyodbc.connect(
+                f'DRIVER={driver};'
+                f'SERVER={server};'
+                f'DATABASE={database};'
+                f'UID={username};'
+                f'PWD={password};'
+            )
+            logging.info("Conexão ao banco de dados estabelecida com sucesso.")
+            return conn
+        except pyodbc.Error as e:
+            print(f"Erro ao conectar ao banco de dados: {e}")
+            logging.error(f"Erro ao conectar ao banco de dados: {e} - Verifique as configurações de conexão ou o banco de dados pode esta offline.")
+            time.sleep(20)
 
 
 def main(page: ft.Page):
+    connect = conectar_banco()
     title = ft.Text("Usuários Sapiens Conectados", size=20)
     idUser = ft.TextField(label="ID User", width=100)
     # page.window_always_on_top = True
@@ -28,7 +53,7 @@ def main(page: ft.Page):
     # page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.update()
 
-    cursor = conn.cursor()
+    cursor = connect.cursor()
 
     SQL_QUERY = """
     SELECT
@@ -52,13 +77,12 @@ def main(page: ft.Page):
         ), 2
     ) AS DATA_CONEXAO,
     comnam AS NAME_SERVER,
-    usrnam AS CONECT_SERVER,
+    usrnam AS CONNECT_SERVER,
     appnam AS NAME_APP,
-    appusr AS CONECT_SAPIENS
+    appusr AS CONNECT_SAPIENS
     FROM sapiens.dbo.r911sec AS sec
     FULL OUTER JOIN sapiens.dbo.r911mod AS modulo ON sec.numsec = modulo.numsec
-    WHERE
-    appnam = 'SAPIENS' ORDER BY modnam;
+    WHERE appnam = 'SAPIENS' ORDER BY modnam;
     """
 
     page.scrollable = True
@@ -70,9 +94,9 @@ def main(page: ft.Page):
             ft.DataColumn(ft.Text("ID_CONEXAO")),
             ft.DataColumn(ft.Text("DATA_CONEXAO")),
             ft.DataColumn(ft.Text("NAME_SERVER")),
-            ft.DataColumn(ft.Text("CONECT_SERVER")),
+            ft.DataColumn(ft.Text("CONNECT_SERVER")),
             ft.DataColumn(ft.Text("NAME_APP")),
-            ft.DataColumn(ft.Text("CONECT_SAPIENS"))
+            ft.DataColumn(ft.Text("CONNECT_SAPIENS"))
         ],
         rows=[]
     )
@@ -85,28 +109,69 @@ def main(page: ft.Page):
             table.rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(row['MODULOS'])),
-                        ft.DataCell(ft.Text(row['ID_CONEXAO'])),
-                        ft.DataCell(ft.Text(str(row['DATA_CONEXAO']))),
-                        ft.DataCell(ft.Text(str(row['NAME_SERVER']))),
-                        ft.DataCell(ft.Text(str(row['CONECT_SERVER']))),
-                        ft.DataCell(ft.Text(str(row['NAME_APP']))),
-                        ft.DataCell(ft.Text(str(row['CONECT_SAPIENS'])))
+                        ft.DataCell(ft.Text(row[0])),
+                        ft.DataCell(ft.Text(row[1])),
+                        ft.DataCell(ft.Text(str(row[2]))),
+                        ft.DataCell(ft.Text(str(row[3]))),
+                        ft.DataCell(ft.Text(str(row[4]))),
+                        ft.DataCell(ft.Text(str(row[5]))),
+                        ft.DataCell(ft.Text(str(row[6])))
                     ]
                 )
             )
         page.update()
 
-    def upDate(e):
-        table.rows.clear()
-        load_data()
+
+ 
+    
+    def close_modal(e):
+        modal.open = False
+        page.update()
+        
+    def login(e):
+        user = 'admin'
+        password = 'admin'
+
+        if user == user_login and password == password_login:
+            print("Login efetuado com sucesso!")
+            modal.open = False
+            page.add(desconectar_usuario)
+            page.update()
+        else:
+            print("Usuário ou senha inválidos!")
+            page.update()
+    
+    
+    modal = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Login"),
+        content=ft.Column([
+            ft.TextField(label="Usuário", value=""),
+            ft.TextField(label="Senha", value="", password=True),
+        ]),
+        actions=[
+            ft.ElevatedButton(
+                "Entrar",
+                on_click=login
+            ),
+            ft.ElevatedButton(
+                "Sair",
+                on_click=close_modal
+            )
+        ]
+    )
+    
+    def modal_login(e):
+        page.dialog = modal
+        modal.open = True
+        page.update()
 
     def delete(e):
         try:
             id = idUser.value
             cursor.execute(f"DELETE FROM sapiens.dbo.r911mod WHERE numsec = {id}")
             cursor.execute(f"DELETE FROM sapiens.dbo.r911sec WHERE numsec = {id}")
-            conn.commit()
+            connect.cursor().commit()
             table.rows.clear()
             load_data()
             page.snack_bar = ft.SnackBar(
@@ -130,25 +195,47 @@ def main(page: ft.Page):
         page.update()
 
     load_data()
-
+    
+    desconectar_usuario = ft.Row([
+    idUser,
+    ft.ElevatedButton(
+        "Desconectar",
+        on_click=delete,
+        height=50,
+    ),
+])
+     
+    page.padding = 100       
     page.add(
-        title,
-        ft.Row([
-            table,
+        title,        
+        ft.Column([
+            ft.Row([ft.ElevatedButton("ADMIN",on_click=modal_login)], alignment=ft.MainAxisAlignment.START),
+            ft.Row([table], alignment=ft.MainAxisAlignment.CENTER),
         ], alignment=ft.MainAxisAlignment.CENTER),
-        ft.ElevatedButton(
-            "UpDate",
-            on_click=upDate
-        ),
-        ft.Row([
-            idUser,
-            ft.ElevatedButton(
-                "Desconectar",
-                on_click=delete,
-                height=50,
-            ),
-        ])
+        # ft.ElevatedButton(
+        #     "UpDate",
+        #     on_click=upDate
+        # ),
+        # ft.Row([
+        #     idUser,
+        #     ft.ElevatedButton(
+        #         "Desconectar",
+        #         on_click=delete,
+        #         height=50,
+        #     ),
+        # ])
     )
 
+    def run():
+        while True:
+            time.sleep(20)
+            table.rows.clear()
+            load_data()
+            page.update()
+    
+    run()
+            
+            
+ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8181)
 
-ft.app(target=main)
+

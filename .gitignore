@@ -3,3 +3,5 @@
 .vscode
 build
 dist
+app.log
+executar_script.bat - Atalho.lnk
